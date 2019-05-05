@@ -1,7 +1,41 @@
 import heapq
 from building_lift import BuildingLift, LiftPassager
 
-def get_lift_graph(lift, passagers, passager_floor):
+def get_lift_graph(lift, passagers, passagers_by_floor, source_floor):
+	floors = [f for f in range(lift.total_floors + 1) if passagers_by_floor[f]]
+	added_floors = set((source_floor,))
+	current_floor = source_floor
+	path = [source_floor]
+	while len(path) < len(floors) + 1:
+		weights = {f: 0 for f in floors if f not in added_floors}
+		# weights = [0 if f not in added_floors else None for f in floors]
+		for f in floors:
+			if f in weights and f is not current_floor:
+				weights[f] = abs(f - current_floor)
+			passagers = passagers_by_floor[f]
+			for passager in passagers:
+				pos_floors = sorted([f, current_floor, passager.destiny_floor])
+				if pos_floors[0] is passager.destiny_floor:
+					for g in range(current_floor, min(floors) - 1, -1):
+						if g in weights:
+							weights[g] += abs(f - passager.destiny_floor)
+				elif pos_floors[2] is passager.destiny_floor:
+					for g in range(current_floor, max(floors) + 1):
+						if g in weights:
+							weights[g] += abs(f - passager.destiny_floor)
+
+		min_weight_floor = None
+		for f in [g for g in floors if g in weights]:
+			if min_weight_floor is None or weights[f] < weights[min_weight_floor]:
+				min_weight_floor = f
+		path.append(min_weight_floor)
+		added_floors.add(min_weight_floor)
+		current_floor = min_weight_floor
+
+	print(path)
+	exit()
+
+
 	vertices = tuple(passagers + [lift])
 	graph = []
 
@@ -81,7 +115,7 @@ def lift_algorithm(total_floors, current_lift_floor, passagers):
 		passagers_by_floor[passager.current_floor].append(passager)
 
 	# Pegar todos os passageiros
-	vertices, graph = get_lift_graph(lift, passagers, lambda p: p.current_floor)
+	vertices, graph = get_lift_graph(lift, passagers, passagers_by_floor, current_lift_floor)
 	path = get_lowest_cost_graph_path(vertices, graph, lift)
 	path = path[1:] # o primeiro é o andar em que se encontra o elevador
 	path = [o.current_floor for o in path]

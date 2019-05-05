@@ -62,6 +62,11 @@ class BuildingLift:
 				f'({self._total_floors}, {self._current_floor})')
 
 	@property
+	def total_floors(self):
+		return self._total_floors
+	
+
+	@property
 	def current_floor(self):
 		return self._current_floor
 
