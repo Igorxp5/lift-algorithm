@@ -1,136 +1,135 @@
 import heapq
 from building_lift import BuildingLift, LiftPassager
 
-def get_lift_graph(lift, passagers, passagers_by_floor, source_floor):
-	floors = [f for f in range(lift.total_floors + 1) if passagers_by_floor[f]]
-	added_floors = set((source_floor,))
-	current_floor = source_floor
-	path = [source_floor]
-	while len(path) < len(floors) + 1:
-		weights = {f: 0 for f in floors if f not in added_floors}
-		# weights = [0 if f not in added_floors else None for f in floors]
-		for f in floors:
-			if f in weights and f is not current_floor:
-				weights[f] = abs(f - current_floor)
-			passagers = passagers_by_floor[f]
-			for passager in passagers:
-				pos_floors = sorted([f, current_floor, passager.destiny_floor])
-				if pos_floors[0] is passager.destiny_floor:
-					for g in range(current_floor, min(floors) - 1, -1):
-						if g in weights:
-							weights[g] += abs(f - passager.destiny_floor)
-				elif pos_floors[2] is passager.destiny_floor:
-					for g in range(current_floor, max(floors) + 1):
-						if g in weights:
-							weights[g] += abs(f - passager.destiny_floor)
 
-		min_weight_floor = None
-		for f in [g for g in floors if g in weights]:
-			if min_weight_floor is None or weights[f] < weights[min_weight_floor]:
-				min_weight_floor = f
-		path.append(min_weight_floor)
-		added_floors.add(min_weight_floor)
-		current_floor = min_weight_floor
+def go_lift(lift, passagers, passagers_by_floor, current_lift_floor):
+	current_floor = current_lift_floor
+	arrived_passagers = set()
 
-	print(path)
-	exit()
-
-
-	vertices = tuple(passagers + [lift])
-	graph = []
-
-	edge_count = 1
-	for p in range(len(passagers)):
-		for q in range(p + 1, len(passagers)):
-			passager_p_floor = passager_floor(passagers[p])
-			passager_q_floor = passager_floor(passagers[q])
-			weight = abs(passager_p_floor - passager_q_floor)
-			edge = weight, edge_count, (passagers[p], passagers[q])
-			graph.append(edge)
-			edge_count += 1
+	destinations = []
+	total_destiny_floors = []
+	for f in range(lift.total_floors + 1):
+		destinations.append(bool(passagers_by_floor[f]))
+		total_destiny_floors.append(0)
 
 	for passager in passagers:
-		weight = abs(lift.current_floor - passager_floor(passager))
-		edge = weight, edge_count, (lift, passager)
-		graph.append(edge)
-		edge_count += 1
+		total_destiny_floors[passager.destiny_floor] += 1
 
-	return vertices, graph
+	destinations[current_floor] = False
+	while len(arrived_passagers) < len(passagers):
+		for passager in passagers_by_floor[current_floor]:
+			if not passager.is_on_destiny_floor():
+				passager.enter_lift(lift)
+				passagers_by_floor[current_floor].remove(passager)
+				destinations[passager.destiny_floor] = True
+				print(f'Passager: {passager} entered the lift.')
 
-def get_lowest_cost_graph_path(vertices, graph, source_vertice):
-	heap_edges = graph.copy()
-	heapq.heapify(heap_edges)
-	total_connected_edges = 0
+		for passager in lift.passagers:
+			if passager.is_on_destiny_floor():
+				passager.exit_lift()
+				arrived_passagers.add(passager)
+				passagers_by_floor[current_floor].append(passager)
+				print(f'Passager: {passager} has reached his destination.')
 
-	final_graph = {v: [] for v in vertices}
-	while heap_edges and total_connected_edges < len(vertices) - 1:
-		weight, edge_count, edge_vertices = heapq.heappop(heap_edges)
-		edge = weight, *edge_vertices
-		valid_edge = True
-		for vertice in  edge_vertices:
-			conditions = (
-				vertice is source_vertice and len(final_graph[vertice]) == 0,
-				vertice is not source_vertice and len(final_graph[vertice]) < 2
-			)
-			valid_edge = valid_edge and any(conditions)
-		if valid_edge:
-			for vertice in edge_vertices:
-				final_graph[vertice].append(edge)
-			total_connected_edges += 1
+		# Remover destinos com passageiros somente à entregar,
+		# que não estão com todos os seus passageiros no elevador.
+		current_destiny_floors = [0] * (lift.total_floors + 1)
+		for passager in lift.passagers:
+			current_destiny_floors[passager.destiny_floor] += 1
+		for f in range(lift.total_floors + 1):
+			total_destiny = current_destiny_floors[f]
+			if total_destiny > 0:
+				destinations[f] = total_destiny_floors[f] == total_destiny
+		
+		up_weight = 0
+		down_weight = 0
+		for f in range(lift.total_floors + 1):
+			if destinations[f]:
+				dist = abs(current_floor - f)
+				if f > current_floor and (not up_weight or dist < up_weight):
+					up_weight = dist
+				elif (
+					f < current_floor
+					and (not down_weight or dist < down_weight)
+				):
+					down_weight = dist
 
-	path = [source_vertice]
-	while len(path) < len(vertices):
-		current_vertice = path[-1]
-		edge = final_graph[current_vertice][0]
-		next_vertice = edge[1] if edge[1] is not current_vertice else edge[2]
-		final_graph[next_vertice].remove(edge)
-		path.append(next_vertice)
-	
-	return tuple(path)
+		worst_up_weight = 0
+		worst_down_weight = 0
+		for p in passagers:
+			if p not in arrived_passagers:
+				if (
+					p.current_floor > current_floor 
+					and p.destiny_floor < current_floor
+				): 
+					weight = abs(current_floor - p.current_floor)
+					weight += abs(p.current_floor - p.destiny_floor)
+					if weight > worst_down_weight:
+						worst_down_weight = weight
+				elif (
+					p.current_floor < current_floor
+					and p.destiny_floor > current_floor
+				):
+					weight = abs(current_floor - p.current_floor)
+					weight += abs(p.current_floor - p.destiny_floor)
+					if weight > worst_up_weight:
+						worst_up_weight = weight
+		up_weight += worst_up_weight
+		down_weight += worst_down_weight
 
-def go_lift_by_path(lift, passagers_by_floor, path):
-	for floor in path:
-		distance_floors = floor - lift.current_floor
-		move_lift = lift.up if distance_floors > 0 else lift.down
-		distance_floors = abs(distance_floors)
+		move_lift_direction = None
+		distance = 0
+		if down_weight == up_weight:
+			up_pointer = current_floor + 1
+			down_pointer = current_floor - 1
+			while (
+				distance == 0 
+				and (down_pointer >= 0 or up_pointer <= lift.total_floors)
+			):
+				if down_pointer >= 0 and destinations[down_pointer]:
+					move_lift_direction = lift.down
+					distance = current_floor - down_pointer
+				elif (
+					up_pointer <= lift.total_floors 
+					and destinations[up_pointer]
+				):
+					move_lift_direction = lift.up
+					distance = up_pointer - current_floor
+				down_pointer -= 1
+				up_pointer += 1
 
-		for _ in range(distance_floors):
-			move_lift(1)
-			for passager in passagers_by_floor[lift.current_floor]:
-				if not passager.is_on_destiny_floor():
-					passager.enter_lift(lift)
-					print(f'Passager: {passager} entered the lift.')
-					passagers_by_floor[lift.current_floor].remove(passager)
+		elif down_weight == 0 or (up_weight != 0 and down_weight > up_weight):
+			move_lift_direction = lift.up
+			for f in range(current_floor + 1, lift.total_floors + 1):
+				if destinations[f]:
+					distance = f - current_floor
+					break
+		else:
+			move_lift_direction = lift.down
+			for f in range(current_floor - 1, -1, -1):
+				if destinations[f]:
+					distance = current_floor - f
+					break
+		
+		# No último laço não há movimentos, 
+		# somente deixadas de pessoas no andar atual.
+		if distance > 0:
+			move_lift_direction(distance)
 
-			for passager in lift.passagers:
-				if passager.is_on_destiny_floor():
-					passager.exit_lift()
-					print(f'Passager: {passager} has reached his destination.')
-					passagers_by_floor[lift.current_floor].append(passager)
+		current_floor = lift.current_floor
+		destinations[current_floor] = False
+
 
 def lift_algorithm(total_floors, current_lift_floor, passagers):
+	# Checar se todos os passageiros possuem ID's diferentes
+	raise_if_not_passagers_different_ids(passagers)
+
 	lift = BuildingLift(total_floors, current_floor=current_lift_floor)
 	passagers_by_floor = {f: [] for f in range(total_floors + 1)}
 	for passager in passagers:
 		passagers_by_floor[passager.current_floor].append(passager)
 
-	# Pegar todos os passageiros
-	vertices, graph = get_lift_graph(lift, passagers, passagers_by_floor, current_lift_floor)
-	path = get_lowest_cost_graph_path(vertices, graph, lift)
-	path = path[1:] # o primeiro é o andar em que se encontra o elevador
-	path = [o.current_floor for o in path]
-
-	go_lift_by_path(lift, passagers_by_floor, path)
-
-	# Deixar todos os passageiros
-	vertices, graph = get_lift_graph(lift, lift.passagers, lambda p: p.destiny_floor)
-	path = get_lowest_cost_graph_path(vertices, graph, lift)
-	path = path[1:] # o primeiro é o andar em que se encontra o elevador
-	path = [o.destiny_floor for o in path]
-
-	go_lift_by_path(lift, passagers_by_floor, path)
-
-	# Fim do Algoritmo
+	go_lift(lift, passagers, passagers_by_floor, current_lift_floor)
 
 	# Printar situação dos andares
 
@@ -138,3 +137,11 @@ def lift_algorithm(total_floors, current_lift_floor, passagers):
 
 	for floor in range(total_floors + 1):
 		print(f'Floor {floor}: {passagers_by_floor[floor]}')
+
+
+def raise_if_not_passagers_different_ids(passagers):
+	ids = set()
+	for passager in passagers:
+		if passager.id in ids:
+			raise RuntimeError('LiftPassager\'s with same id.')
+		ids.add(passager.id)

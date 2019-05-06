@@ -1,8 +1,7 @@
 class LiftPassager:
-	def __init__(self, id_, current_floor, destiny_floor, weight=0):
+	def __init__(self, id_, current_floor, destiny_floor):
 		self._id = id_
 		self._lift = None
-		self._weight = weight
 		self._current_floor = current_floor
 		self._destiny_floor = destiny_floor
 
@@ -10,9 +9,17 @@ class LiftPassager:
 		return (f'{self.__class__.__name__}' + 
 				f'({self._id}, {self._current_floor}, {self._destiny_floor})')
 
+	def __eq__(self, other):
+		if not isinstance(other, LiftPassager):
+			return NotImplemented
+		return self._id == other._id
+
+	def __hash__(self):
+		return hash((self._id,))
+
 	@property
-	def weight(self):
-		return self._weight
+	def id(self):
+		return self._id
 
 	@property
 	def destiny_floor(self):
@@ -31,6 +38,7 @@ class LiftPassager:
 
 	def exit_lift(self):
 		LiftPassager.raise_if_not_lift(self._lift)
+		self.current_floor # atualizar andar atual
 		self._lift.withdraw_passager(self)
 		self._lift = None
 
@@ -50,12 +58,10 @@ class BuildingLift:
 	_ORDER_SUFFIX = {1: 'st', 2: 'nd', 3: 'rd'}
 	_ORDER_DEFAULT_SUFFIX = 'th'
 
-	def __init__(self, total_floors, current_floor=0, max_weight=0):
+	def __init__(self, total_floors, current_floor=0):
 		self._total_floors = total_floors
-		self._max_weight = max_weight
 		self._passagers = []
 		self._current_floor = current_floor
-		self._current_total_weight = 0
 
 	def __repr__(self):
 		return (f'{self.__class__.__name__}' + 
@@ -64,7 +70,6 @@ class BuildingLift:
 	@property
 	def total_floors(self):
 		return self._total_floors
-	
 
 	@property
 	def current_floor(self):
@@ -72,7 +77,7 @@ class BuildingLift:
 
 	@property
 	def passagers(self):
-		return self._passagers
+		return list(self._passagers)
 	
 	def up(self, floors):
 		if self._current_floor + floors > self._total_floors:
@@ -90,10 +95,7 @@ class BuildingLift:
 
 	def put_passager(self, passager):
 		BuildingLift.raise_if_not_passager(passager)
-		if self._current_total_weight + passager.weight > self._max_weight:
-			raise RuntimeError('Maximum lift capacity exceeded.')
 		self._passagers.append(passager)
-		self._current_total_weight += passager.weight
 		print('A passenger entered the lift.')
 
 	def withdraw_passager(self, passager):
@@ -101,18 +103,15 @@ class BuildingLift:
 		if passager not in self._passagers:
 			raise RuntimeError('Passager is not in the lift.')
 		self._passagers.remove(passager)
-		self._current_total_weight -= passager.weight
 		print('A passenger left the lift.')
 
 	def __print_current_floor(self): 
 		suffix = BuildingLift._ORDER_SUFFIX.get(
 			self._current_floor, BuildingLift._ORDER_DEFAULT_SUFFIX
 		)
-		print(f'The lift is on {self._current_floor}{suffix} floor')
+		print(f'The lift is on {self._current_floor}{suffix} floor.')
 
 	@staticmethod
 	def raise_if_not_passager(passager):
 		if not isinstance(passager, LiftPassager):
 			raise TypeError('Argument must be a iterable of LiftPassager\'s.')
-
-		
