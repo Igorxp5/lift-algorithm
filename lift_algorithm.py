@@ -1,14 +1,25 @@
-import heapq
+__author__ = 'Igor Fernandes'
+__version__ = '0.0.0'
+
 from building_lift import BuildingLift, LiftPassager
 
+
 def get_best_path(lift, passagers, current_lift_floor):
+	"""Retorna o melhor caminho a ser seguido por um elevador
+	para obter a menor distância entre saltos possíveis. 
+	"""
 	def get_solution_leaps(solution):
+		"""Retorna quantidade de saltos de um caminho."""
 		solution_leaps = 0
 		for i in range(1, len(solution)):
 			solution_leaps += abs(solution[i - 1] - solution[i])
 		return solution_leaps
 
 	def compare_solution(solution1, solution2):
+		"""Compara dois caminhos e retorna o melhor entre os dois,
+		ou seja, o que possuir o menor somatório da distância
+		entre os saltos.
+		"""
 		solution1_leaps = get_solution_leaps(solution1)
 		solution2_leaps = get_solution_leaps(solution2)
 
@@ -17,20 +28,35 @@ def get_best_path(lift, passagers, current_lift_floor):
 		return solution1
 
 	def next_up_destiny(destinations, current_floor):
+		"""Retorna o andar do destino mais próximo 
+		do andar atual no sentido para cima.
+		"""
 		for f in range(current_floor + 1, len(destinations)):
 			if destinations[f]:
 				return f
 
 	def next_down_destiny(destinations, current_floor):
+		"""Retorna o andar do destino mais próximo 
+		do andar atual no sentido para baixo.
+		"""
 		for f in range(current_floor - 1, -1, -1):
 			if destinations[f]:
 				return f
 
 	def best_solution_recursive(passagers, lift_passagers, arrived_passagers, 
 								current_floor, total_floors):
+		"""
+		A retorna a melhor solução dado: os passageiros participantes 
+		do problema, os passageiros atuais do elevador, os passageiros 
+		que já chegaram ao seu destino e a posição do elevador.
+		"""
 		if len(arrived_passagers) == len(passagers):
 			return []
 		else:
+			# O vetor 'destinations' determina todos os andares que
+			# o elevador deve passar. Seguindo os seguintes critérios:
+			# - Andar dos passageiros que ainda estão esperando pelo elevador
+			# - Andar dos que os passageiros que estão no elevador querem ir  
 			destinations = [False] * (total_floors + 1)
 			c_lift_passagers = lift_passagers.copy()
 			c_arrived_passagers = arrived_passagers.copy()
@@ -52,6 +78,11 @@ def get_best_path(lift, passagers, current_lift_floor):
 					else:
 						destinations[passager.destiny_floor] = True
 
+			# É comparado duas soluções e retornado a melhor entre elas.
+			# Uma solução que usa como próximo destino, o próximo
+			# andar acima do elevador que foi marcado como destino.
+			# A outra solução é considerando como destino um andar 
+			# abaixo do elevador que foi marcado como destino. 
 			next_up_floor = next_up_destiny(destinations, current_floor)
 			next_down_floor = next_down_destiny(destinations, current_floor)
 
@@ -88,7 +119,9 @@ def get_best_path(lift, passagers, current_lift_floor):
 		current_lift_floor, lift.total_floors
 	)
 
+
 def go_lift_by_path(lift, passagers_by_floor, path):
+	"""Desenvolve os movimentos do elevador baseado no caminho passado."""
 	for floor in path:
 		distance_floors = floor - lift.current_floor
 		move_lift = lift.up if distance_floors > 0 else lift.down
@@ -109,6 +142,11 @@ def go_lift_by_path(lift, passagers_by_floor, path):
 
 
 def lift_algorithm(total_floors, current_lift_floor, passagers):
+	"""Executa o algortimo de menor tempo de movimento para 
+	o elevador levar ao destino todos os passageiros, e mostra
+	como resposta a estado final dos andares do edifício.
+	"""
+
 	# Checar se todos os passageiros possuem ID's diferentes
 	raise_if_not_passagers_different_ids(passagers)
 
@@ -129,6 +167,7 @@ def lift_algorithm(total_floors, current_lift_floor, passagers):
 
 
 def raise_if_not_passagers_different_ids(passagers):
+	"""Lança exceção caso haja passageiros com ID semelhantes."""
 	ids = set()
 	for passager in passagers:
 		if passager.id in ids:
